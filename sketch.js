@@ -11,10 +11,11 @@ function setup() {
   background(0);
   textFont("monospace");
   textSize(fontSize);
-  isMobile = windowWidth < 768;
 
+  isMobile = windowWidth < 768;
   columns = floor(width / fontSize);
 
+  drops = [];
   for (let i = 0; i < columns; i++) {
     let trailLength = floor(random(20, maxTrailLength));
     drops[i] = {
@@ -31,22 +32,13 @@ function setup() {
 }
 
 function draw() {
-  background(0, 70);
+  background(0, 70); // Fades previous frame for trailing effect
 
   for (let i = 0; i < columns; i++) {
     let x = i * fontSize;
     let drop = drops[i];
 
-    // OPTIONAL: skip center on mobile if needed for readability
-    /*
-    if (isMobile) {
-      let left = width * 0.25;
-      let right = width * 0.75;
-      if (x > left && x < right) continue;
-    }
-    */
-
-    // Update characters occasionally
+    // Update character lifespans
     for (let j = 0; j < drop.trail.length; j++) {
       let symbol = drop.trail[j];
       symbol.life++;
@@ -56,7 +48,7 @@ function draw() {
       }
     }
 
-    // Color & draw
+    // Draw characters
     let hueShift = frameCount * 0.2 + i * 10;
     for (let j = 0; j < drop.trail.length; j++) {
       let y = (drop.y - j) * fontSize;
@@ -71,20 +63,19 @@ function draw() {
       text(drop.trail[j].char, x, y);
     }
 
-    // Move downward
+    // Move strand down and reset if offscreen
+    let trailEndY = (drop.y - drop.trail.length) * fontSize;
     drop.y += drop.speed;
 
-    // Wait for the full trail to fall off screen before resetting
-    let trailEndY = (drop.y - drop.trail.length) * fontSize;
     if (trailEndY > height + fontSize) {
-      drop.y = -random(5, drop.trail.length); // Restart from above
+      drop.y = -random(5, drop.trail.length);
     }
   }
 }
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
-  setup(); // re-run full setup to recheck mobile & reset drops
+  setup();
 }
 
 
