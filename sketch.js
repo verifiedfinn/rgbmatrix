@@ -3,14 +3,17 @@ let columns;
 let drops = [];
 let chars = "アァイィウヴエェオカガキギクグケゲコゴサザシジスズセゼソゾタダチッヂヅテデトドナニヌネノハバパヒビピフブプヘベペホボポマミムメモヤユヨラリルレロワヲンABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 let maxTrailLength = 30;
-let changeRate = 8; // how many frames before symbol changes
+let changeRate = 8;
+let isMobile = false;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  background(0); // Prevent initial white flash
+  background(0);
   textFont("monospace");
   textSize(fontSize);
-  columns = floor(width / fontSize); // ✅ FIX: initialize columns here
+  isMobile = windowWidth < 768;
+
+  columns = isMobile ? floor(width / (fontSize * 1.5)) : floor(width / fontSize);
 
   for (let i = 0; i < columns; i++) {
     let trailLength = floor(random(20, maxTrailLength));
@@ -32,9 +35,17 @@ function draw() {
 
   for (let i = 0; i < columns; i++) {
     let x = i * fontSize;
+
+    // On mobile, skip strands in center 50% of screen
+    if (isMobile) {
+      let left = width * 0.25;
+      let right = width * 0.75;
+      if (x > left && x < right) continue;
+    }
+
     let drop = drops[i];
 
-    // Update trail characters only occasionally
+    // Update characters occasionally
     for (let j = 0; j < drop.trail.length; j++) {
       let symbol = drop.trail[j];
       symbol.life++;
@@ -44,7 +55,7 @@ function draw() {
       }
     }
 
-    // Draw trail with RGB gradient
+    // Color & draw
     let hueShift = frameCount * 0.2 + i * 10;
     for (let j = 0; j < drop.trail.length; j++) {
       let y = (drop.y - j) * fontSize;
@@ -53,12 +64,12 @@ function draw() {
       let r = sin((hueShift + j * 5) * 0.01) * 127 + 128;
       let g = sin((hueShift + j * 5 + 100) * 0.01) * 127 + 128;
       let b = sin((hueShift + j * 5 + 200) * 0.01) * 127 + 128;
+      let alpha = isMobile ? 120 : 255;
 
-      fill(r, g, b);
+      fill(r, g, b, alpha);
       text(drop.trail[j].char, x, y);
     }
 
-    // Move strand downward
     drop.y += drop.speed;
     if (drop.y - drop.trail.length > height / fontSize || random() > 0.9995) {
       drop.y = random(-20, 0);
@@ -68,17 +79,6 @@ function draw() {
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
-  columns = floor(width / fontSize);
-  drops = [];
-  for (let i = 0; i < columns; i++) {
-    let trailLength = floor(random(20, maxTrailLength));
-    drops[i] = {
-      y: random(-100, 0),
-      speed: random(0.05, 0.1),
-      trail: Array(trailLength).fill("").map(() => ({
-        char: chars.charAt(floor(random(chars.length))),
-        life: floor(random(changeRate))
-      }))
-    };
-  }
+  setup(); // re-run setup on resize for mobile re-check
 }
+
