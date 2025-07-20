@@ -36,7 +36,7 @@ function draw() {
   for (let i = 0; i < columns; i++) {
     let x = i * fontSize;
 
-    // On mobile, skip strands in center 50% of screen
+    // Skip strands in center on mobile
     if (isMobile) {
       let left = width * 0.25;
       let right = width * 0.75;
@@ -45,7 +45,7 @@ function draw() {
 
     let drop = drops[i];
 
-    // Update characters occasionally
+    // Update characters
     for (let j = 0; j < drop.trail.length; j++) {
       let symbol = drop.trail[j];
       symbol.life++;
@@ -55,7 +55,7 @@ function draw() {
       }
     }
 
-    // Color & draw
+    // Draw characters with RGB and fading alpha
     let hueShift = frameCount * 0.2 + i * 10;
     for (let j = 0; j < drop.trail.length; j++) {
       let y = (drop.y - j) * fontSize;
@@ -64,21 +64,25 @@ function draw() {
       let r = sin((hueShift + j * 5) * 0.01) * 127 + 128;
       let g = sin((hueShift + j * 5 + 100) * 0.01) * 127 + 128;
       let b = sin((hueShift + j * 5 + 200) * 0.01) * 127 + 128;
-      let alpha = isMobile ? 120 : 255;
+      let fadeAlpha = map(j, 0, drop.trail.length, 255, 0);
+      let alpha = isMobile ? fadeAlpha * 0.5 : fadeAlpha;
 
       fill(r, g, b, alpha);
       text(drop.trail[j].char, x, y);
     }
 
+    // Move drop downward
     drop.y += drop.speed;
-    if (drop.y - drop.trail.length > height / fontSize || random() > 0.9995) {
-      drop.y = random(-20, 0);
+
+    // Loop strand cleanly from above screen
+    if (drop.y - drop.trail.length > height / fontSize) {
+      drop.y = -drop.trail.length;
     }
   }
 }
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
-  setup(); // re-run setup on resize for mobile re-check
+  setup(); // Recalculate layout & mobile mode
 }
 
