@@ -13,7 +13,7 @@ function setup() {
   textSize(fontSize);
   isMobile = windowWidth < 768;
 
-  columns = isMobile ? floor(width / (fontSize * 1.5)) : floor(width / fontSize);
+  columns = floor(width / fontSize);
 
   for (let i = 0; i < columns; i++) {
     let trailLength = floor(random(20, maxTrailLength));
@@ -35,17 +35,18 @@ function draw() {
 
   for (let i = 0; i < columns; i++) {
     let x = i * fontSize;
+    let drop = drops[i];
 
-    // Skip strands in center on mobile
+    // OPTIONAL: skip center on mobile if needed for readability
+    /*
     if (isMobile) {
       let left = width * 0.25;
       let right = width * 0.75;
       if (x > left && x < right) continue;
     }
+    */
 
-    let drop = drops[i];
-
-    // Update characters
+    // Update characters occasionally
     for (let j = 0; j < drop.trail.length; j++) {
       let symbol = drop.trail[j];
       symbol.life++;
@@ -55,7 +56,7 @@ function draw() {
       }
     }
 
-    // Draw characters with RGB and fading alpha
+    // Color & draw
     let hueShift = frameCount * 0.2 + i * 10;
     for (let j = 0; j < drop.trail.length; j++) {
       let y = (drop.y - j) * fontSize;
@@ -64,25 +65,26 @@ function draw() {
       let r = sin((hueShift + j * 5) * 0.01) * 127 + 128;
       let g = sin((hueShift + j * 5 + 100) * 0.01) * 127 + 128;
       let b = sin((hueShift + j * 5 + 200) * 0.01) * 127 + 128;
-      let fadeAlpha = map(j, 0, drop.trail.length, 255, 0);
-      let alpha = isMobile ? fadeAlpha * 0.5 : fadeAlpha;
+      let alpha = isMobile ? 120 : 255;
 
       fill(r, g, b, alpha);
       text(drop.trail[j].char, x, y);
     }
 
-    // Move drop downward
+    // Move downward
     drop.y += drop.speed;
 
-    // Loop strand cleanly from above screen
-    if (drop.y - drop.trail.length > height / fontSize) {
-      drop.y = -drop.trail.length;
+    // Wait for the full trail to fall off screen before resetting
+    let trailEndY = (drop.y - drop.trail.length) * fontSize;
+    if (trailEndY > height + fontSize) {
+      drop.y = -random(5, drop.trail.length); // Restart from above
     }
   }
 }
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
-  setup(); // Recalculate layout & mobile mode
+  setup(); // re-run full setup to recheck mobile & reset drops
 }
+
 
