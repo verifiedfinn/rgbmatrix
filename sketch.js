@@ -26,15 +26,11 @@ function applySizeProfile() {
     trailScale = 1;
     fadeAlpha = 70;
   } else if (h <= 3500) {
-    // long page: speed up proportionally so drops actually traverse it,
-    // slightly longer trails so strands don't look stubby at scale
-    speedScale = h / 900;
+    speedScale = sqrt(h / 900);   // ~1.6x at 2400px instead of 2.7x
     trailScale = 1.3;
     fadeAlpha = 70;
   } else {
-    // very long page: cap the speed so drops don't become streaks,
-    // longer trails + slower fade keep the page feeling populated
-    speedScale = min(h / 900, 4.5);
+    speedScale = min(sqrt(h / 900), 2.5);  // caps around 2.2–2.5x
     trailScale = 1.6;
     fadeAlpha = 55;
   }
