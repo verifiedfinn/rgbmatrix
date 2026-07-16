@@ -1,107 +1,111 @@
-let fontSize = 16;
-let columns;
-let drops = [];
-let chars = "アァイィウヴエェオカガキギクグケゲコゴサザシジスズセゼソゾタダチッヂヅテデトドナニヌネノハバパヒビピフブプヘベペホボポマミムメモヤユヨラリルレロワヲンABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-let maxTrailLength = 30;
-let changeRate = 8;
-let isMobile = false;
+<script>
+(function () {
+  var DESKTOP = window.matchMedia('(min-width: 768px)').matches;
+  if (!DESKTOP) return; // mobile untouched — the strip embed handles it
 
-// ---- size-adaptive settings ----
-let speedScale = 1;
-let trailScale = 1;
-let fadeAlpha = 70;
+  var f;
+  var currentHero = 0;
 
-// ---- edge mode: ?edges=1 empties the middle band BELOW the hero.
-//      ?hero=NNN (px) = where middle rain stops. Default 900. ----
-let edgesOnly = false;
-let heroLimit = 900;
-let gapStart = 0.22;
-let gapEnd   = 0.78;
+  function heroBottom() {
+    var first = document.querySelector('#SITE_PAGES section');
+    if (!first) return 0;
+    var r = first.getBoundingClientRect();
+    return Math.round(r.bottom + window.scrollY); // page-Y where the hero ends
+  }
 
-function applySizeProfile() {
-  isMobile = windowWidth < 768;
-  let params = new URLSearchParams(window.location.search);
-  edgesOnly = params.get('edges') === '1';
-  heroLimit = parseInt(params.get('hero')) || 900;
-  let h = windowHeight;
-  if (isMobile) {
-    speedScale = 1; trailScale = 1; fadeAlpha = 70;
-  } else if (h <= 1200) {
-    speedScale = 1; trailScale = 1; fadeAlpha = 70;
-  } else if (h <= 3500) {
-    speedScale = sqrt(h / 900); trailScale = 1.3; fadeAlpha = 70;
+  function injectRain(hero) {
+    currentHero = hero;
+    f = document.createElement('iframe');
+    f.src = 'https://verifiedfinn.github.io/rgbmatrix/?edges=1&hero=' + hero;
+    f.title = 'matrix rain background';
+    f.style.cssText = 'position:absolute;top:0;left:0;width:100%;border:0;z-index:0;pointer-events:none;height:100vh;';
+    document.body.prepend(f);
+    sizeRain();
+    if (window.ResizeObserver) {
+      var site = document.getElementById('SITE_CONTAINER');
+      new ResizeObserver(sizeRain).observe(site || document.body);
+    }
+    window.addEventListener('resize', function () {
+      sizeRain();
+      var h = heroBottom();
+      if (h && Math.abs(h - currentHero) > 60) {
+        currentHero = h;
+        f.src = 'https://verifiedfinn.github.io/rgbmatrix/?edges=1&hero=' + h;
+      }
+    });
+  }
+
+  function sizeRain() {
+    // measure the CONTENT (SITE_CONTAINER), never the body —
+    // the iframe lives in body, so measuring body creates a
+    // feedback loop that grows past the footer forever
+    var site = document.getElementById('SITE_CONTAINER');
+    var h = site ? Math.round(site.getBoundingClientRect().height)
+                 : window.innerHeight; // fallback before Wix renders
+    if (f && h > 100 && Math.abs(parseInt(f.style.height) - h) > 4) {
+      f.style.height = h + 'px';
+    }
+  }
+
+  function injectStyles() {
+    if (document.getElementById('rain-styles')) return;
+    var s = document.createElement('style');
+    s.id = 'rain-styles';
+    s.textContent =
+      'html{background:#000 !important;overflow-x:hidden !important;}' +
+      'body,#SITE_CONTAINER,#main_MF,#BACKGROUND_GROUP,#BACKGROUND_GROUP *,[id^="pageBackground"]{background:transparent !important;}' +
+      'section iframe[src*="rgbmatrix"]{display:none !important;}' +
+      /* container outline plates — swap the 0 for .88 if you want dark fills */
+      '#SITE_PAGES [data-testid="container-bg"]{' +
+        'background:rgba(0,0,0,0) !important;' +
+        'border:1px solid rgba(255,255,255,.14);' +
+        'border-radius:8px;' +
+      '}';
+    document.head.appendChild(s);
+  }
+
+  function clearBlacks() {
+    var sections = [].slice.call(document.querySelectorAll('#SITE_PAGES section'));
+    if (!sections.length) return false;
+    sections.forEach(function (sec) {
+      sec.querySelectorAll('[data-testid="colorUnderlay"]').forEach(function (u) {
+        var c = getComputedStyle(u).backgroundColor.match(/[\d.]+/g) || [];
+        if ((c.length > 3 ? +c[3] : 1) === 1 && +c[0] < 30 && +c[1] < 30 && +c[2] < 30) {
+          u.style.setProperty('background-color', 'transparent', 'important');
+        }
+      });
+    });
+    document.querySelectorAll('[id^="bgLayers_pageBackground"] [data-testid="colorUnderlay"]').forEach(function (u) {
+      u.style.setProperty('background-color', 'transparent', 'important');
+    });
+    return true;
+  }
+
+  function start() {
+    injectStyles();
+    var tries = 0;
+    (function tick() {
+      var ok = clearBlacks();
+      if (!f) {
+        var h = heroBottom();
+        if (h > 100) injectRain(h);
+      }
+      sizeRain();
+      if (ok && f && tries > 8) {
+        console.log('[rain] hero stops at', currentHero + 'px, iframe height:',
+          f.style.height + ', panels:',
+          document.querySelectorAll('#SITE_PAGES [data-testid="container-bg"]').length);
+        return;
+      }
+      if (++tries > 60) return;
+      setTimeout(tick, 250);
+    })();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
   } else {
-    speedScale = min(sqrt(h / 900), 2.5); trailScale = 1.6; fadeAlpha = 55;
+    start();
   }
-}
-
-function setup() {
-  applySizeProfile();
-  if (!isMobile) pixelDensity(1);
-  createCanvas(windowWidth, windowHeight);
-  background(0);
-  textFont("monospace");
-  textSize(fontSize);
-  noStroke();
-  columns = floor(width / fontSize);
-  drops = [];
-  for (let i = 0; i < columns; i++) {
-    let frac = (i * fontSize) / width;
-    let isMiddle = edgesOnly && frac > gapStart && frac < gapEnd;
-    let trailLength = floor(random(20, maxTrailLength) * trailScale);
-    drops[i] = {
-      y: random(-100, 0),
-      // middle columns: original gentle speed (they only live in the hero);
-      // edge columns: adaptive speed for the full-page run
-      speed: random(0.05, 0.1) * (isMiddle ? 1 : speedScale),
-      maxY: isMiddle ? heroLimit : height, // stop line in px
-      trail: Array(trailLength).fill("").map(() => ({
-        char: chars.charAt(floor(random(chars.length))),
-        life: floor(random(changeRate))
-      }))
-    };
-  }
-  frameRate(isMobile ? 60 : 30);
-}
-
-function draw() {
-  background(0, fadeAlpha);
-  for (let i = 0; i < columns; i++) {
-    let drop = drops[i];
-    let x = i * fontSize;
-    for (let j = 0; j < drop.trail.length; j++) {
-      let symbol = drop.trail[j];
-      symbol.life++;
-      if (symbol.life >= changeRate) {
-        symbol.char = chars.charAt(floor(random(chars.length)));
-        symbol.life = 0;
-      }
-    }
-    let hueShift = frameCount * 0.2 + i * 10;
-    for (let j = 0; j < drop.trail.length; j++) {
-      let y = (drop.y - j) * fontSize;
-      if (y > drop.maxY || y < 0) continue; // clip at this column's stop line
-      let r = sin((hueShift + j * 5) * 0.01) * 127 + 128;
-      let g = sin((hueShift + j * 5 + 100) * 0.01) * 127 + 128;
-      let b = sin((hueShift + j * 5 + 200) * 0.01) * 127 + 128;
-      let alpha = isMobile ? 120 : 255;
-      // fade out over the last 15% before the stop line (hero boundary)
-      let fadeZone = drop.maxY * 0.85;
-      if (y > fadeZone) {
-        alpha *= map(y, fadeZone, drop.maxY, 1, 0);
-      }
-      fill(r, g, b, alpha);
-      text(drop.trail[j].char, x, y);
-    }
-    let trailEndY = (drop.y - drop.trail.length) * fontSize;
-    drop.y += drop.speed;
-    if (trailEndY * 1 > drop.maxY + fontSize || trailEndY > height + fontSize) {
-      drop.y = -random(5, drop.trail.length);
-    }
-  }
-}
-
-function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
-  setup();
-}
+})();
+</script>
