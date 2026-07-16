@@ -12,8 +12,8 @@ let fadeAlpha = 70;
 // ---- edge mode (?edges=1): middle band is rain-free BELOW the hero ----
 let edgesOnly = false;
 let heroLimit = 900;
-const HERO_PAD  = 70;    // rain fades out this many px ABOVE the measured hero bottom
-const SAFE_BAND = 1300;  // px width of protected middle — anchored to content, not screen %
+const HERO_PAD  = 20;    // fade ends this many px above the measured hero bottom
+const SAFE_BAND = 1300;  // px width of protected middle band, centered
 
 function applySizeProfile() {
   isMobile = windowWidth < 768;
@@ -42,8 +42,8 @@ function setup() {
   noStroke();
   columns = floor(width / fontSize);
   drops = [];
-  // fixed-pixel protected band, centered — same clearance on every screen width.
-  // if the window is narrower than the band, leave a minimum 60px rail each side.
+  // fixed-pixel protected band, centered — same clearance on every screen.
+  // if the window is narrower than the band, keep a minimum 60px rail per side.
   let gapL = max((width - SAFE_BAND) / 2, 60);
   let gapR = width - gapL;
   for (let i = 0; i < columns; i++) {
@@ -90,9 +90,13 @@ function draw() {
       let g = sin((hueShift + j * 5 + 100) * 0.01) * 127 + 128;
       let b = sin((hueShift + j * 5 + 200) * 0.01) * 127 + 128;
       let alpha = isMobile ? 120 : 255;
-      let fadeZone = drop.maxY * 0.85;
-      if (y > fadeZone) {
-        alpha *= map(y, fadeZone, drop.maxY, 1, 0);
+      // fade only for hero-limited columns — mobile and edge rails
+      // run full brightness off their edges like the original
+      if (drop.maxY < height) {
+        let fadeZone = drop.maxY - 110;
+        if (y > fadeZone) {
+          alpha *= map(y, fadeZone, drop.maxY, 1, 0);
+        }
       }
       fill(r, g, b, alpha);
       text(drop.trail[j].char, x, y);
