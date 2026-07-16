@@ -9,18 +9,17 @@ let isMobile = false;
 let speedScale = 1;
 let trailScale = 1;
 let fadeAlpha = 70;
-// ---- edge mode: ?edges=1 empties the middle band BELOW the hero.
-//      ?hero=NNN (px) = where middle rain stops. Default 900. ----
+// ---- edge mode (?edges=1): middle band is rain-free BELOW the hero ----
 let edgesOnly = false;
 let heroLimit = 900;
-let gapStart = 0.22;
-let gapEnd   = 0.78;
+const HERO_PAD  = 70;    // rain fades out this many px ABOVE the measured hero bottom
+const SAFE_BAND = 1300;  // px width of protected middle — anchored to content, not screen %
 
 function applySizeProfile() {
   isMobile = windowWidth < 768;
   let params = new URLSearchParams(window.location.search);
   edgesOnly = params.get('edges') === '1';
-  heroLimit = parseInt(params.get('hero')) || 900;
+  heroLimit = max((parseInt(params.get('hero')) || 900) - HERO_PAD, 200);
   let h = windowHeight;
   if (isMobile) {
     speedScale = 1; trailScale = 1; fadeAlpha = 70;
@@ -43,16 +42,18 @@ function setup() {
   noStroke();
   columns = floor(width / fontSize);
   drops = [];
+  // fixed-pixel protected band, centered — same clearance on every screen width.
+  // if the window is narrower than the band, leave a minimum 60px rail each side.
+  let gapL = max((width - SAFE_BAND) / 2, 60);
+  let gapR = width - gapL;
   for (let i = 0; i < columns; i++) {
-    let frac = (i * fontSize) / width;
-    let isMiddle = edgesOnly && frac > gapStart && frac < gapEnd;
+    let px = i * fontSize;
+    let isMiddle = edgesOnly && px > gapL && px < gapR;
     let trailLength = floor(random(20, maxTrailLength) * trailScale);
     drops[i] = {
       y: random(-100, 0),
-      // middle columns: original gentle speed (they only live in the hero);
-      // edge columns: adaptive speed for the full-page run
       speed: random(0.05, 0.1) * (isMiddle ? 1 : speedScale),
-      maxY: isMiddle ? heroLimit : height, // stop line in px
+      maxY: isMiddle ? heroLimit : height,
       trail: Array(trailLength).fill("").map(() => ({
         char: chars.charAt(floor(random(chars.length))),
         life: floor(random(changeRate))
@@ -63,8 +64,7 @@ function setup() {
 }
 
 function draw() {
-  // self-heal: if the iframe was resized and windowResized didn't fire,
-  // catch it here and rebuild for the new dimensions
+  // self-heal: if the iframe was resized and windowResized didn't fire
   if (abs(windowHeight - height) > 8 || abs(windowWidth - width) > 8) {
     resizeCanvas(windowWidth, windowHeight);
     setup();
@@ -85,12 +85,11 @@ function draw() {
     let hueShift = frameCount * 0.2 + i * 10;
     for (let j = 0; j < drop.trail.length; j++) {
       let y = (drop.y - j) * fontSize;
-      if (y > drop.maxY || y < 0) continue; // clip at this column's stop line
+      if (y > drop.maxY || y < 0) continue;
       let r = sin((hueShift + j * 5) * 0.01) * 127 + 128;
       let g = sin((hueShift + j * 5 + 100) * 0.01) * 127 + 128;
       let b = sin((hueShift + j * 5 + 200) * 0.01) * 127 + 128;
       let alpha = isMobile ? 120 : 255;
-      // fade out over the last 15% before the stop line (hero boundary)
       let fadeZone = drop.maxY * 0.85;
       if (y > fadeZone) {
         alpha *= map(y, fadeZone, drop.maxY, 1, 0);
@@ -100,7 +99,7 @@ function draw() {
     }
     let trailEndY = (drop.y - drop.trail.length) * fontSize;
     drop.y += drop.speed;
-    if (trailEndY * 1 > drop.maxY + fontSize || trailEndY > height + fontSize) {
+    if (trailEndY > drop.maxY + fontSize || trailEndY > height + fontSize) {
       drop.y = -random(5, drop.trail.length);
     }
   }
