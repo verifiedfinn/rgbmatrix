@@ -11,10 +11,15 @@ let speedScale = 1;
 let trailScale = 1;
 let fadeAlpha = 70;
 
+// ---- edge-only mode: ?edges=1 keeps the middle band empty ----
+let edgesOnly = false;
+let gapStart = 0.22;  // middle band starts at 22% of width
+let gapEnd   = 0.78;  // and ends at 78% — rain only outside this
+
 function applySizeProfile() {
   isMobile = windowWidth < 768;
+  edgesOnly = new URLSearchParams(window.location.search).get('edges') === '1';
   let h = windowHeight;
-
   if (isMobile) {
     // phone embed: original behavior, untouched
     speedScale = 1;
@@ -38,20 +43,25 @@ function applySizeProfile() {
 
 function setup() {
   applySizeProfile();
-
   if (!isMobile) {
     pixelDensity(1); // biggest perf win on tall canvases
   }
-
   createCanvas(windowWidth, windowHeight);
   background(0);
   textFont("monospace");
   textSize(fontSize);
   noStroke();
-
   columns = floor(width / fontSize);
   drops = [];
   for (let i = 0; i < columns; i++) {
+    // edge-only mode: no drops in the middle band
+    if (edgesOnly) {
+      let frac = (i * fontSize) / width;
+      if (frac > gapStart && frac < gapEnd) {
+        drops[i] = null;
+        continue;
+      }
+    }
     let trailLength = floor(random(20, maxTrailLength) * trailScale);
     drops[i] = {
       y: random(-100, 0),
@@ -62,15 +72,15 @@ function setup() {
       }))
     };
   }
-
   frameRate(isMobile ? 60 : 30);
 }
 
 function draw() {
   background(0, fadeAlpha); // Fades previous frame for trailing effect
   for (let i = 0; i < columns; i++) {
-    let x = i * fontSize;
     let drop = drops[i];
+    if (!drop) continue; // middle band, edge-only mode
+    let x = i * fontSize;
     // Update character lifespans
     for (let j = 0; j < drop.trail.length; j++) {
       let symbol = drop.trail[j];
