@@ -6,46 +6,38 @@ let maxTrailLength = 30;
 let changeRate = 8;
 let isMobile = false;
 
-// ---- size-adaptive settings, decided fresh every setup() ----
+// ---- size-adaptive settings ----
 let speedScale = 1;
 let trailScale = 1;
 let fadeAlpha = 70;
 
-// ---- edge-only mode: ?edges=1 keeps the middle band empty ----
+// ---- edge mode: ?edges=1 empties the middle band BELOW the hero.
+//      ?hero=NNN (px) = where middle rain stops. Default 900. ----
 let edgesOnly = false;
-let gapStart = 0.22;  // middle band starts at 22% of width
-let gapEnd   = 0.78;  // and ends at 78% — rain only outside this
+let heroLimit = 900;
+let gapStart = 0.22;
+let gapEnd   = 0.78;
 
 function applySizeProfile() {
   isMobile = windowWidth < 768;
-  edgesOnly = new URLSearchParams(window.location.search).get('edges') === '1';
+  let params = new URLSearchParams(window.location.search);
+  edgesOnly = params.get('edges') === '1';
+  heroLimit = parseInt(params.get('hero')) || 900;
   let h = windowHeight;
   if (isMobile) {
-    // phone embed: original behavior, untouched
-    speedScale = 1;
-    trailScale = 1;
-    fadeAlpha = 70;
+    speedScale = 1; trailScale = 1; fadeAlpha = 70;
   } else if (h <= 1200) {
-    // normal viewport-sized canvas: original desktop feel
-    speedScale = 1;
-    trailScale = 1;
-    fadeAlpha = 70;
+    speedScale = 1; trailScale = 1; fadeAlpha = 70;
   } else if (h <= 3500) {
-    speedScale = sqrt(h / 900);   // ~1.6x at 2400px instead of 2.7x
-    trailScale = 1.3;
-    fadeAlpha = 70;
+    speedScale = sqrt(h / 900); trailScale = 1.3; fadeAlpha = 70;
   } else {
-    speedScale = min(sqrt(h / 900), 2.5);  // caps around 2.2–2.5x
-    trailScale = 1.6;
-    fadeAlpha = 55;
+    speedScale = min(sqrt(h / 900), 2.5); trailScale = 1.6; fadeAlpha = 55;
   }
 }
 
 function setup() {
   applySizeProfile();
-  if (!isMobile) {
-    pixelDensity(1); // biggest perf win on tall canvases
-  }
+  if (!isMobile) pixelDensity(1);
   createCanvas(windowWidth, windowHeight);
   background(0);
   textFont("monospace");
@@ -54,18 +46,15 @@ function setup() {
   columns = floor(width / fontSize);
   drops = [];
   for (let i = 0; i < columns; i++) {
-    // edge-only mode: no drops in the middle band
-    if (edgesOnly) {
-      let frac = (i * fontSize) / width;
-      if (frac > gapStart && frac < gapEnd) {
-        drops[i] = null;
-        continue;
-      }
-    }
+    let frac = (i * fontSize) / width;
+    let isMiddle = edgesOnly && frac > gapStart && frac < gapEnd;
     let trailLength = floor(random(20, maxTrailLength) * trailScale);
     drops[i] = {
       y: random(-100, 0),
-      speed: random(0.05, 0.1) * speedScale,
+      // middle columns: original gentle speed (they only live in the hero);
+      // edge columns: adaptive speed for the full-page run
+      speed: random(0.05, 0.1) * (isMiddle ? 1 : speedScale),
+      maxY: isMiddle ? heroLimit : height, // stop line in px
       trail: Array(trailLength).fill("").map(() => ({
         char: chars.charAt(floor(random(chars.length))),
         life: floor(random(changeRate))
@@ -76,12 +65,10 @@ function setup() {
 }
 
 function draw() {
-  background(0, fadeAlpha); // Fades previous frame for trailing effect
+  background(0, fadeAlpha);
   for (let i = 0; i < columns; i++) {
     let drop = drops[i];
-    if (!drop) continue; // middle band, edge-only mode
     let x = i * fontSize;
-    // Update character lifespans
     for (let j = 0; j < drop.trail.length; j++) {
       let symbol = drop.trail[j];
       symbol.life++;
@@ -90,22 +77,25 @@ function draw() {
         symbol.life = 0;
       }
     }
-    // Draw characters
     let hueShift = frameCount * 0.2 + i * 10;
     for (let j = 0; j < drop.trail.length; j++) {
       let y = (drop.y - j) * fontSize;
-      if (y > height || y < 0) continue;
+      if (y > drop.maxY || y < 0) continue; // clip at this column's stop line
       let r = sin((hueShift + j * 5) * 0.01) * 127 + 128;
       let g = sin((hueShift + j * 5 + 100) * 0.01) * 127 + 128;
       let b = sin((hueShift + j * 5 + 200) * 0.01) * 127 + 128;
       let alpha = isMobile ? 120 : 255;
+      // fade out over the last 15% before the stop line (hero boundary)
+      let fadeZone = drop.maxY * 0.85;
+      if (y > fadeZone) {
+        alpha *= map(y, fadeZone, drop.maxY, 1, 0);
+      }
       fill(r, g, b, alpha);
       text(drop.trail[j].char, x, y);
     }
-    // Move strand down and reset if offscreen
     let trailEndY = (drop.y - drop.trail.length) * fontSize;
     drop.y += drop.speed;
-    if (trailEndY > height + fontSize) {
+    if (trailEndY * 1 > drop.maxY + fontSize || trailEndY > height + fontSize) {
       drop.y = -random(5, drop.trail.length);
     }
   }
